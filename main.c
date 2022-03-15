@@ -17,7 +17,7 @@
 }
 
 typedef struct SortFunc {
-    void (*sort)(int *a, size_t n);
+    long long (*sort)(int *a, size_t n);
 
     char name[64];
 } SortFunc;
@@ -58,37 +58,48 @@ int isOrdered(const int *a, const size_t size) {
 
 // ________________Sorts________________
 
-void bubbleSort(int *a, const size_t size) {
+long long bubbleSort(int *a, const size_t size) {
+    long long nComps = 0;
+
     for (size_t i = 0; i < size - 1; i++)
         for (size_t j = size - 1; j > i; j--)
-            if (a[j - 1] > a[j])
+            if (++nComps && a[j - 1] > a[j])
                 swap(&a[j - 1], &a[j], sizeof(int));
+    return nComps;
 }
 
-void selectionSort(int *a, const size_t size) {
+long long selectionSort(int *a, const size_t size) {
+    long long nComps = 0;
+
     for (size_t i = 0; i < size - 1; i++) {
         size_t minPos = i;
         for (size_t j = i + 1; j < size; j++)
-            if (a[j] < a[minPos])
+            if (++nComps && a[j] < a[minPos])
                 minPos = j;
 
         swap(&a[i], &a[minPos], sizeof(int));
     }
+    return nComps;
 }
 
-void insertionSort(int *a, const size_t size) {
+long long insertionSort(int *a, const size_t size) {
+    long long nComps = 0;
+
     for (size_t i = 1; i < size; i++) {
         int t = a[i];
         size_t j = i;
-        while (j > 0 && a[j - 1] > t) {
+        while (++nComps && j > 0 && a[j - 1] > t) {
             a[j] = a[j - 1];
             j--;
         }
         a[j] = t;
     }
+    return nComps;
 }
 
-void compSort(int *a, const size_t size) {
+long long compSort(int *a, const size_t size) {
+    long long nComps = 0;
+
     size_t step = size;
     int swapped = 1;
     while (step > 1 || swapped) {
@@ -97,22 +108,26 @@ void compSort(int *a, const size_t size) {
 
         swapped = 0;
         for (size_t i = 0, j = i + step; j < size; i++, j++)
-            if (a[i] > a[j]) {
+            if (++nComps && a[i] > a[j]) {
                 swap(&a[i], &a[j], sizeof(int));
                 swapped = 1;
             }
     }
+    return nComps;
 }
 
-void shellSort(int *a, const size_t size) {
+long long shellSort(int *a, const size_t size) {
+    long long nComps = 0;
+
     for (size_t step = size / 2; step > 0; step /= 2)
         for (size_t i = 0; i < size; i++) {
             size_t j = i;
-            while (j >= step && a[j - step] > a[j]) {
+            while (++nComps && j >= step && a[j - step] > a[j]) {
                 swap(&a[j], &a[j - step], sizeof(int));
                 j -= step;
             }
         }
+    return nComps;
 }
 
 void countSort(int *a, const unsigned char *keys, const size_t size) {
@@ -152,7 +167,7 @@ void digitSort(int *a, const size_t size) {
 }
 
 
-// __________Generations__________
+// __________Generators__________
 
 void generateRandomArray(int *a, size_t n) {
     srand(time(0));
@@ -173,9 +188,9 @@ void generateOrderedBackwards(int *a, size_t n) {
 
 // __________________________________________________
 
-void checkTime(void (*sortFunc)(int *, size_t),
-               void (*generateFunc)(int *, size_t),
-               size_t size, char *experimentName) {
+void checkTimeAndComparations(long long (*sortFunc)(int *, size_t),
+                              void (*generateFunc)(int *, size_t),
+                              size_t size, char *experimentName) {
     static size_t runCounter = 1;
 
     static int innerBuffer[100000];
@@ -185,10 +200,11 @@ void checkTime(void (*sortFunc)(int *, size_t),
 
     // замер времени
     double time;
-    TIME_TEST({ sortFunc(innerBuffer, size); }, time);
+    long long nComps;
+    TIME_TEST({nComps = sortFunc(innerBuffer, size);}, time);
     printf("Status:");
     if (isOrdered(innerBuffer, size)) {
-        printf("OK! Time: %.3fs.\n", time);
+        printf("OK! Time: %.3fs. | Comparations: %lld\n", time, nComps);
 
         char filename[256];
         sprintf(filename, "./data/%s.csv", experimentName);
@@ -197,7 +213,7 @@ void checkTime(void (*sortFunc)(int *, size_t),
             printf("FileOpenError %s", filename);
             exit(1);
         }
-        fprintf(f, "%zu; %.3f\n", size, time);
+        fprintf(f, "%zu; %.3f; %lld\n", size, time, nComps);
         fclose(f);
     } else {
         printf("Wrong!\n");
@@ -216,8 +232,7 @@ void timeExperiment() {
             {selectionSort, "selectionSort"},
             {insertionSort, "insertionSort"},
             {compSort,      "compSort"},
-            {shellSort,     "shellSort"},
-            {digitSort,     "digitSort"},
+            {shellSort,     "shellSort"}
     };
     const unsigned FUNCS_N = ARRAY_SIZE(sorts);
 
@@ -240,9 +255,9 @@ void timeExperiment() {
             for (int j = 0; j < CASES_N; j++) {
                 // генерация имени файла
                 static char filename[128];
-                sprintf(filename, "%s_%s_time",
+                sprintf(filename, "%s_%s_timeAndComps",
                         sorts[i].name, generatingFuncs[j].name);
-                checkTime(sorts[i].sort, generatingFuncs[j].generate, size, filename);
+                checkTimeAndComparations(sorts[i].sort, generatingFuncs[j].generate, size, filename);
             }
         }
         printf("\n");
